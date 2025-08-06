@@ -1,39 +1,19 @@
-// app/api/posts/[slug]/route.ts
-import { NextResponse } from 'next/server';
-
-type Post = { slug: string; title: string; content: string };
-
-// We reuse the same 'posts' variable as above — but in real you would use a DB.
-
-declare global {
-  // Trick to reuse posts array:
-  // @ts-ignore
-  var posts: Post[] | undefined;
-}
-
-if (!global.posts) global.posts = [
-  {
-    slug: "my-first-post",
-    title: "My First Post",
-    content: "This is the content of my first post.",
-  },
-  {
-    slug: "hello-nextjs",
-    title: "Hello Next.js",
-    content: "Welcome to learning Next.js with dynamic routes!",
-  },
-];
-
-const posts = global.posts;
+// app/api/blogs/[slug]/route.ts
+import { NextResponse } from "next/server";
+import clientPromise from "../../../../lib/mongodb";
 
 export async function DELETE(request: Request, { params }: { params: { slug: string } }) {
-  const { slug } = params;
+  try {
+    const client = await clientPromise;
+    const db = client.db();
 
-  const index = posts.findIndex(p => p.slug === slug);
-  if (index === -1) {
-    return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    const result = await db.collection("posts").deleteOne({ slug: params.slug });
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Blog not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Blog deleted" });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete blog" }, { status: 500 });
   }
-
-  posts.splice(index, 1);
-  return NextResponse.json({ message: 'Post deleted' }, { status: 200 });
 }
