@@ -1,45 +1,36 @@
-// app/api/posts/route.ts
-import { NextResponse } from 'next/server';
+// app/api/blogs/route.ts
+import { NextResponse } from "next/server";
+import clientPromise from "../../../lib/mongodb";
 
-type Post = { slug: string; title: string; content: string };
-
-// Simple in-memory store to simulate a DB (server lifetime)
-let posts: Post[] = [
-  {
-    slug: "my-first-post",
-    title: "My First Post",
-    content: "This is the content of my first post.",
-  },
-  {
-    slug: "hello-nextjs",
-    title: "Hello Next.js",
-    content: "Welcome to learning Next.js with dynamic routes!",
-  },
-];
-
-// GET /api/posts - list all posts
 export async function GET() {
-  return NextResponse.json(posts);
+  try {
+    const client = await clientPromise;
+    const db = client.db(); // uses default DB from URI
+    const blogs = await db.collection("posts").find({}).toArray();
+    return NextResponse.json(blogs);
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch blogs" }, { status: 500 });
+  }
 }
 
-// POST /api/posts - add a new post
 export async function POST(request: Request) {
   try {
-    const newPost = await request.json() as Post;
+    const client = await clientPromise;
+    const db = client.db();
 
-    // Basic validation
-    if (!newPost.slug || !newPost.title || !newPost.content) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    const blog = await request.json();
+    if (!blog.slug || !blog.title || !blog.content) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    // Check for duplicate slug
-    if(posts.find(p => p.slug === newPost.slug)) {
-      return NextResponse.json({ error: 'Slug already exists' }, { status: 400 });
+    const existing = await db.collection("posts").findOne({ slug: blog.slug });
+    if (existing) {
+      return NextResponse.json({ error: "Slug already exists" }, { status: 400 });
     }
 
-    posts.push(newPost);
-    return NextResponse.json(newPost, { status: 201 });
+    await db.collection("posts").insertOne(blog);
+    return NextResponse.json(blog, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'Invalid data' }, { status: 400 });
+    return NextResponse.json({ error: "Failed to add blog" }, { status: 500 });
   }
 }
